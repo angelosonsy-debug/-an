@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحدي مجموعات الكشافة ⚜️</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --secondary: #5d4037;
+            --accent: #fbc02d;
+            --bg: #f0f2f5;
+        }
+
+        * { box-sizing: border-box; font-family: 'Cairo', sans-serif; }
+        body { background-color: var(--bg); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+
+        .container {
+            background: white;
+            width: 100%;
+            max-width: 650px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border-bottom: 10px solid var(--primary);
+        }
+
+        /* شاشات المسابقة */
+        .screen { display: none; padding: 40px 30px; text-align: center; }
+        .screen.active { display: block; }
+
+        .header { background: var(--primary); color: white; padding: 20px; margin: -40px -30px 30px -30px; }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .btn { 
+            padding: 12px 35px; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: 700; 
+            font-size: 1.1rem;
+            transition: 0.3s;
+            background: var(--primary);
+            color: white;
+        }
+        .btn:disabled { opacity: 0.5; }
+
+        /* الأسئلة */
+        .question { font-size: 1.3rem; font-weight: 700; color: var(--secondary); margin-bottom: 25px; }
+        .options-grid { display: grid; gap: 12px; }
+        .option {
+            padding: 15px;
+            border: 2px solid #f0f0f0;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .option:hover { border-color: var(--primary); background: #f1f8e9; }
+        .option.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* الجدول */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
+        th { background: #f8f9fa; color: var(--secondary); }
+
+        .progress-bar { height: 6px; background: #eee; width: 100%; position: absolute; top: 0; right: 0; }
+        #progress-fill { height: 100%; background: var(--accent); width: 0%; transition: 0.4s; }
+
+        .fade { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container" style="position: relative;">
+    <div class="progress-bar"><div id="progress-fill"></div></div>
+
+    <div id="start-screen" class="screen active fade">
+        <div style="font-size: 4rem;">⚜️</div>
+        <h2>مرحباً بكم في تحدي القادة</h2>
+        <p>ادخل اسم المجموعة للمشاركة:</p>
+        <input type="text" id="team-name-input" placeholder="اسم المجموعة (مثلاً: أسود الكشافة)">
+        <button class="btn" onclick="startQuiz()">ابدأ التحدي</button>
+        <p id="error-msg" style="color: red; font-size: 0.9rem; margin-top: 10px;"></p>
+    </div>
+
+    <div id="quiz-screen" class="screen fade">
+        <div class="header">
+            <h3 id="count-text">السؤال 1 / 24</h3>
+            <span id="category-name" style="font-size: 0.8rem; opacity: 0.9;"></span>
+        </div>
+        <div class="question" id="question-text"></div>
+        <div class="options-grid" id="options-grid"></div>
+        <div style="margin-top: 30px;">
+            <button class="btn" id="next-btn" disabled onclick="nextQuestion()">السؤال التالي</button>
+        </div>
+    </div>
+
+    <div id="result-screen" class="screen fade">
+        <h2 id="congrats-text">عاش يا أبطال!</h2>
+        <div style="font-size: 1.2rem; margin-bottom: 10px;">نتيجة مجموعة <span id="display-team-name" style="color: var(--primary); font-weight: bold;"></span> هي:</div>
+        <div style="font-size: 3rem; font-weight: 800; color: var(--primary);" id="final-score">0 / 24</div>
+        
+        <hr style="margin: 30px 0; border: 0; border-top: 1px dashed #ccc;">
+        
+        <h3>🏆 لوحة الصدارة (ترتيب المجموعات)</h3>
+        <table id="leaderboard">
+            <thead>
+                <tr>
+                    <th>الترتيب</th>
+                    <th>المجموعة</th>
+                    <th>النتيجة</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        
+        <button class="btn" style="background: var(--secondary); margin-top: 25px;" onclick="location.reload()">تسجيل مجموعة جديدة</button>
+        <button class="btn" style="background: #d32f2f; margin-top: 10px; font-size: 0.8rem;" onclick="clearData()">مسح كل البيانات</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { c: "كشافة", q: "أين أقيم أول مخيم كشفي في العالم عام 1907؟", o: ["جزيرة براونسي", "لندن", "نيويورك", "باريس"], a: 0 },
+        { c: "كشافة", q: "ما هي العقدة التي تستخدم لربط حبلين من سمكين مختلفين؟", o: ["العقدة الوتدية", "العقدة الأفقية", "عقدة التوصيلة", "العقدة الثمانية"], a: 2 },
+        { c: "كشافة", q: "ماذا يمثل المنديل الكشفي المطوي على شكل مثلث؟", o: ["الشجاعة", "النظافة", "الخيمة", "مساعدة الآخرين"], a: 1 },
+        { c: "كشافة", q: "ما هو الترتيب الصحيح للمراحل الكشفية؟", o: ["أشبال، كشافة، جوالة", "كشافة، جوالة، أشبال", "جوالة، أشبال، كشافة", "أشبال، جوالة، كشافة"], a: 0 },
+        { c: "كشافة", q: "في أي جهة يوضع المنديل الكشفي عند ارتداء الزي؟", o: ["فوق الياقة", "تحت الياقة", "في الجيب", "حول المعصم"], a: 1 },
+        { c: "كشافة", q: "ما معنى كلمة 'سياحة' في الكشافة؟", o: ["السفر للفنادق", "رحلة خلوية سيراً على الأقدام", "زيارة المتاحف", "التخييم"], a: 1 },
+        { c: "ثقافة عامة", q: "ما هي أكبر قارة في العالم؟", o: ["أفريقيا", "أوروبا", "آسيا", "أمريكا"], a: 2 },
+        { c: "ثقافة عامة", q: "من هو مخترع المصباح الكهربائي؟", o: ["نيوتن", "إديسون", "أينشتاين", "بيل"], a: 1 },
+        { c: "ثقافة عامة", q: "ما هو الغاز الذي يتنفسه الإنسان؟", o: ["النيتروجين", "CO2", "الأكسجين", "الهيدروجين"], a: 2 },
+        { c: "ثقافة عامة", q: "عاصمة اليابان هي؟", o: ["بكين", "سيول", "طوكيو", "بانكوك"], a: 2 },
+        { c: "ثقافة عامة", q: "كم عدد ألوان قوس قزح؟", o: ["5", "6", "7", "8"], a: 2 },
+        { c: "ثقافة عامة", q: "أسرع حيوان بري في العالم؟", o: ["الأسد", "الفهد", "الحصان", "الغزال"], a: 1 },
+        { c: "كرة قدم", q: "من هو الملقب بـ 'الدون'؟", o: ["ميسي", "نيمار", "رونالدو", "مبابي"], a: 2 },
+        { c: "كرة قدم", q: "مدة الشوط الواحد في الكرة؟", o: ["30 دقيقة", "45 دقيقة", "60 دقيقة", "90 دقيقة"], a: 1 },
+        { c: "كرة قدم", q: "بطل كأس العالم 2022؟", o: ["فرنسا", "كرواتيا", "الأرجنتين", "المغرب"], a: 2 },
+        { c: "كرة قدم", q: "عدد لاعبي الفريق الواحد بالملعب؟", o: ["9", "10", "11", "12"], a: 2 },
+        { c: "كرة قدم", q: "مقر الاتحاد الدولي لكرة القدم (FIFA)؟", o: ["باريس", "لندن", "مدريد", "زيورخ"], a: 3 },
+        { c: "كرة قدم", q: "النادي الملكي هو؟", o: ["برشلونة", "ريال مدريد", "ليفربول", "بايرن"], a: 1 },
+        { c: "ذكاء", q: "شيء كلما زاد نقص؟", o: ["الحفرة", "العمر", "النور", "المال"], a: 1 },
+        { c: "ذكاء", q: "يسير بلا رجلين ولا يدخل إلا بالأذنين؟", o: ["الهواء", "الصوت", "الماء", "الكهرباء"], a: 1 },
+        { c: "ذكاء", q: "رجل في المطر لم يبتل شعره، لماذا؟", o: ["سريع", "معطف", "أصلع", "خفيف"], a: 2 },
+        { c: "ذكاء", q: "شيء يقرصك ولا تراه؟", o: ["النملة", "البرد", "الجوع", "الكهرباء"], a: 2 },
+        { c: "ذكاء", q: "خال أبنائك وليس خالك؟", o: ["أخوك", "أبوك", "أنت", "عمك"], a: 2 },
+        { c: "ذكاء", q: "شيء تذبحه وتبكي عليه؟", o: ["الدجاجة", "البصل", "الوقت", "السر"], a: 1 }
+    ];
+
+    let currentIdx = 0;
+    let score = 0;
+    let selected = null;
+    let currentTeamName = "";
+
+    function startQuiz() {
+        const input = document.getElementById('team-name-input');
+        const name = input.value.trim();
+        const error = document.getElementById('error-msg');
+
+        if (!name) {
+            error.innerText = "برجاء إدخال اسم المجموعة!";
+            return;
+        }
+
+        // التحقق من أن الاسم لم يستخدم من قبل
+        let history = JSON.parse(localStorage.getItem('scout_quiz_history') || "[]");
+        if (history.find(h => h.name === name)) {
+            error.innerText = "هذه المجموعة شاركت بالفعل! اختر اسماً آخر.";
+            return;
+        }
+
+        currentTeamName = name;
+        document.getElementById('start-screen').classList.remove('active');
+        document.getElementById('quiz-screen').classList.add('active');
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        const q = questions[currentIdx];
+        selected = null;
+        document.getElementById('next-btn').disabled = true;
+        document.getElementById('count-text').innerText = `السؤال ${currentIdx + 1} / ${questions.length}`;
+        document.getElementById('category-name').innerText = `قسم ${q.c}`;
+        document.getElementById('question-text').innerText = q.q;
+        document.getElementById('progress-fill').style.width = `${(currentIdx / questions.length) * 100}%`;
+
+        const grid = document.getElementById('options-grid');
+        grid.innerHTML = '';
+        q.o.forEach((opt, i) => {
+            const div = document.createElement('div');
+            div.className = 'option fade';
+            div.innerText = opt;
+            div.onclick = () => {
+                selected = i;
+                document.querySelectorAll('.option').forEach(el => el.classList.remove('active'));
+                div.classList.add('active');
+                document.getElementById('next-btn').disabled = false;
+            };
+            grid.appendChild(div);
+        });
+    }
+
+    function nextQuestion() {
+        if (selected === questions[currentIdx].a) score++;
+        currentIdx++;
+        if (currentIdx < questions.length) {
+            renderQuestion();
+        } else {
+            finishQuiz();
+        }
+    }
+
+    function finishQuiz() {
+        // حفظ النتيجة في السجل
+        let history = JSON.parse(localStorage.getItem('scout_quiz_history') || "[]");
+        history.push({ name: currentTeamName, score: score });
+        localStorage.setItem('scout_quiz_history', JSON.stringify(history));
+
+        document.getElementById('progress-fill').style.width = `100%`;
+        document.getElementById('quiz-screen').classList.remove('active');
+        document.getElementById('result-screen').classList.add('active');
+        
+        document.getElementById('display-team-name').innerText = currentTeamName;
+        document.getElementById('final-score').innerText = `${score} / ${questions.length}`;
+        
+        updateLeaderboard();
+    }
+
+    function updateLeaderboard() {
+        let history = JSON.parse(localStorage.getItem('scout_quiz_history') || "[]");
+        // ترتيب التنازلي حسب السكور
+        history.sort((a, b) => b.score - a.score);
+
+        const tbody = document.querySelector('#leaderboard tbody');
+        tbody.innerHTML = '';
+        history.forEach((entry, index) => {
+            const row = `<tr>
+                <td>${index + 1}</td>
+                <td>${entry.name}</td>
+                <td>${entry.score} / ${questions.length}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function clearData() {
+        if(confirm("هل أنت متأكد من مسح كافة نتائج المجموعات؟")) {
+            localStorage.removeItem('scout_quiz_history');
+            location.reload();
+        }
+    }
+</script>
+
+</body>
+</html>
